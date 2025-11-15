@@ -6,7 +6,7 @@
 
 ## Core Technologies
 
-- **Language**: Python 3.12+ (Agent), TypeScript (CDK & Lambda)
+- **Language**: Python 3.12+ (Agent & Lambda), TypeScript (CDK)
 - **Framework**: Strands Agents (AI Agent), AWS CDK (Infrastructure)
 - **Runtime**: AWS Bedrock AgentCore (Agent実行), AWS Lambda (Events処理)
 - **AI Model**: Amazon Bedrock Claude Sonnet 4.5
