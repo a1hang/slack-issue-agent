@@ -45,9 +45,9 @@ repos:
       - id: end-of-file-fixer
       # Trim trailing whitespace
       - id: trailing-whitespace
-      # Prevent commits to main branch (disabled for initial commit)
-      # - id: no-commit-to-branch
-      #   args: [--branch, main, --branch, master]
+      # Prevent commits to main branch
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
       # Check for merge conflict markers
       - id: check-merge-conflict
       # Check for case conflicts in filenames
