@@ -144,6 +144,14 @@ npm test
 
 このプロジェクトは実験用プロジェクトです。
 
+### 使用しているオープンソースソフトウェア
+
+このプロジェクトは以下のオープンソースソフトウェアを使用しています:
+
+- **[gotalab/cc-sdd](https://github.com/gotalab/cc-sdd)** (MIT License)
+  - Spec-Driven Development ワークフロー (`.claude/commands/kiro/`, `.kiro/settings/`)
+  - 詳細は `NOTICE` ファイルおよび各ディレクトリの `LICENSE` ファイルを参照してください
+
 ---
 
 ## 参考リンク
