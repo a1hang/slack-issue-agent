@@ -23,6 +23,24 @@ Kiro-style Spec Driven Development implementation on AI-DLC (AI Development Life
 
 - Think in English, but generate responses in Japanese (思考は英語、回答の生成は日本語で行うように)
 
+## Code Documentation Constraints
+
+**IMPORTANT**: `.kiro/specs/` はGitHub管理対象外のため、プロダクトコード・コミットメッセージ・PRにspecsへの参照を含めてはならない
+
+### 禁止事項
+
+- ❌ プロダクトコード内のコメントでspecsファイル（requirements.md, design.md等）を参照
+- ❌ コミットメッセージでspecsの内容を引用
+- ❌ PR説明でspecsファイルへのリンクを記載
+- ❌ コード内で「Requirement X.Y」のような仕様書参照
+
+### 推奨事項
+
+- ✅ コメントは実装意図を自己完結的に説明
+- ✅ 技術的根拠（AWS公式ドキュメント、ベストプラクティス）を明記
+- ✅ セキュリティ要件はAWS Well-Architected Frameworkを参照
+- ✅ GitHub Issue番号での追跡は許可（Issue本体はGitHub管理）
+
 ## Minimal Workflow
 
 - Phase 0 (optional): `/kiro:steering`, `/kiro:steering-custom`
