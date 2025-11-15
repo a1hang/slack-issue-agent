@@ -1,0 +1,57 @@
+# Node.js
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CDK
+cdk.out/
+.cdk.staging/
+
+# Build artifacts
+build/
+*.tsbuildinfo
+
+# Keep .devcontainer
+!.devcontainer/
+
+# Cleanup: Archived documentation (not for OSS)
+_archive/
+
+# Cleanup: IAM definitions and environment-specific code (not for OSS)
+_local/
+
+# Kiro: Specs are development artifacts (verbose for external users)
+.kiro/specs/

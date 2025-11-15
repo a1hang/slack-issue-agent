@@ -1,0 +1,99 @@
+# Pre-commit hooks configuration
+# See https://pre-commit.com for more information
+
+repos:
+  # Ruff - Python linter and formatter (replaces black, isort, flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      # Run linter with auto-fix
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+      # Run formatter
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # mypy - Python type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        args: [--strict, --python-version=3.12]
+        additional_dependencies:
+          - pytest>=8.0.0
+          - strands-agents>=1.15.0
+          - slack-sdk>=3.0.0
+          - httpx>=0.27.0
+        files: ^agent/src/ # Only check src/, exclude tests/
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Prevent committing large files
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      # Check YAML syntax
+      - id: check-yaml
+        args: [--unsafe] # Allow custom tags in CDK YAML
+      # Check JSON syntax
+      - id: check-json
+      # Check TOML syntax
+      - id: check-toml
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+      # Trim trailing whitespace
+      - id: trailing-whitespace
+      # Prevent commits to main branch (disabled for initial commit)
+      # - id: no-commit-to-branch
+      #   args: [--branch, main, --branch, master]
+      # Check for merge conflict markers
+      - id: check-merge-conflict
+      # Check for case conflicts in filenames
+      - id: check-case-conflict
+
+  # git-secrets - Prevent committing AWS credentials and tokens
+  - repo: local
+    hooks:
+      - id: git-secrets
+        name: git-secrets
+        entry: git secrets --scan
+        language: system
+        pass_filenames: false
+
+  # Prettier - TypeScript/JavaScript/JSON formatter
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, json, yaml, markdown]
+        exclude: ^(package-lock\.json|\.vscode/|\.kiro/specs/)
+
+  # ESLint - TypeScript/JavaScript linter
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.17.0
+    hooks:
+      - id: eslint
+        files: ^cdk/.*\.(ts|js)$
+        types_or: [javascript, jsx, ts, tsx]
+        additional_dependencies:
+          - eslint@^9.0.0
+          - typescript@^5.0.0
+          - "@typescript-eslint/parser@^8.0.0"
+          - "@typescript-eslint/eslint-plugin@^8.0.0"
+
+# Global exclusions
+exclude: |
+  (?x)^(
+    node_modules/|
+    \.venv/|
+    dist/|
+    build/|
+    cdk\.out/|
+    __pycache__/|
+    \.pytest_cache/|
+    \.ruff_cache/|
+    _local/|
+    _archive/
+  )

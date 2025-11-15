@@ -1,0 +1,13 @@
+[tools]
+node = "22"
+python = "3.12"
+
+[env._.python.venv]
+path = ".venv"
+create = true
+
+[tasks.setup]
+run = "cd cdk && npm install && cd ../agent && uv sync"
+
+[tasks.test]
+run = "cd cdk && npm run test && cd ../agent && pytest"
