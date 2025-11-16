@@ -116,6 +116,205 @@ npm test
 
 ---
 
+## デプロイ
+
+### 前提条件
+
+1. **AWS CLI設定**:
+
+   ```bash
+   aws configure
+   # Region: ap-northeast-1 (東京リージョン)
+   # Output: json
+   ```
+
+2. **Node.js 22+とAWS CDKのインストール**:
+   ```bash
+   mise install nodejs@22
+   npm install -g aws-cdk
+   cdk --version  # v2.x を確認
+   ```
+
+### ステップ 1: SSM Parameter Store の設定
+
+AWS CDKデプロイの前に、以下の4つのSSM Parameter Storeパラメータを作成する必要があります。
+
+**重要**: これらのパラメータが存在しない場合、CDKデプロイは失敗します。
+
+#### 必要なパラメータ
+
+1. **Slack Bot Token** (`/slack-issue-agent/slack/bot-token`)
+2. **Slack Signing Secret** (`/slack-issue-agent/slack/signing-secret`)
+3. **Trello API Key** (`/slack-issue-agent/trello/api-key`)
+4. **Trello Token** (`/slack-issue-agent/trello/token`)
+
+#### AWS CLIコマンド
+
+```bash
+# 1. Slack Bot Token (xoxb- で始まるトークン)
+aws ssm put-parameter \
+  --name "/slack-issue-agent/slack/bot-token" \
+  --value "xoxb-YOUR-SLACK-BOT-TOKEN" \
+  --type "SecureString" \
+  --description "Slack Bot User OAuth Token" \
+  --region ap-northeast-1
+
+# 2. Slack Signing Secret (Slack App設定画面から取得)
+aws ssm put-parameter \
+  --name "/slack-issue-agent/slack/signing-secret" \
+  --value "YOUR-SLACK-SIGNING-SECRET" \
+  --type "SecureString" \
+  --description "Slack App Signing Secret for request verification" \
+  --region ap-northeast-1
+
+# 3. Trello API Key (https://trello.com/app-key から取得)
+aws ssm put-parameter \
+  --name "/slack-issue-agent/trello/api-key" \
+  --value "YOUR-TRELLO-API-KEY" \
+  --type "SecureString" \
+  --description "Trello API Key" \
+  --region ap-northeast-1
+
+# 4. Trello Token (Trello API Key画面で生成)
+aws ssm put-parameter \
+  --name "/slack-issue-agent/trello/token" \
+  --value "YOUR-TRELLO-TOKEN" \
+  --type "SecureString" \
+  --description "Trello User Token" \
+  --region ap-northeast-1
+```
+
+#### パラメータ設定の確認
+
+```bash
+# 作成されたパラメータを確認 (値は表示されない)
+aws ssm describe-parameters \
+  --parameter-filters "Key=Name,Values=/slack-issue-agent/" \
+  --region ap-northeast-1
+
+# 特定のパラメータ値を確認 (復号化して表示)
+aws ssm get-parameter \
+  --name "/slack-issue-agent/slack/bot-token" \
+  --with-decryption \
+  --query 'Parameter.Value' \
+  --output text \
+  --region ap-northeast-1
+```
+
+#### セキュリティ設定
+
+**SecureString タイプ**:
+
+- すべてのパラメータは `SecureString` タイプで作成されます
+- AWS KMS (デフォルトキー `alias/aws/ssm`) による自動暗号化
+- Standard tier (無料) を使用し、コスト最適化
+
+**KMS 暗号化**:
+
+```bash
+# カスタムKMSキーを使用する場合（オプション）
+aws ssm put-parameter \
+  --name "/slack-issue-agent/slack/bot-token" \
+  --value "xoxb-YOUR-SLACK-BOT-TOKEN" \
+  --type "SecureString" \
+  --key-id "alias/your-custom-kms-key" \
+  --description "Slack Bot User OAuth Token" \
+  --region ap-northeast-1
+```
+
+#### CDK デプロイ時のエラーメッセージ例
+
+パラメータが存在しない場合、CDK デプロイは以下のようなエラーで失敗します:
+
+```
+❌  SlackIssueAgentSharedStack failed: Error: Parameter /slack-issue-agent/slack/bot-token not found
+    at ParameterNotFound: /slack-issue-agent/slack/bot-token (Service: SSM; Status Code: 400; Error Code: ParameterNotFound)
+
+Required SSM Parameters:
+  - /slack-issue-agent/slack/bot-token
+  - /slack-issue-agent/slack/signing-secret
+  - /slack-issue-agent/trello/api-key
+  - /slack-issue-agent/trello/token
+
+Please create these parameters using the AWS CLI commands in the README.
+```
+
+### ステップ 2: Dockerイメージのビルドとプッシュ
+
+AgentCore用のDockerイメージをビルドし、ECRにプッシュします。
+
+```bash
+# ECRリポジトリURIを取得（CDKデプロイ後）
+export ECR_REPO_URI=$(aws cloudformation describe-stacks \
+  --stack-name SlackIssueAgentAgentCoreStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`AgentRepositoryUri`].OutputValue' \
+  --output text \
+  --region ap-northeast-1)
+
+# ECRログイン
+aws ecr get-login-password --region ap-northeast-1 | \
+  docker login --username AWS --password-stdin $ECR_REPO_URI
+
+# ARM64イメージをビルド
+cd agent
+docker buildx build --platform linux/arm64 -t slack-issue-agent:latest .
+
+# タグ付けとプッシュ
+docker tag slack-issue-agent:latest $ECR_REPO_URI:latest
+docker push $ECR_REPO_URI:latest
+```
+
+**miseタスクを使用する場合**:
+
+```bash
+mise run docker:build-and-push
+```
+
+### ステップ 3: CDK デプロイ
+
+```bash
+cd cdk
+
+# CDK依存関係をインストール
+npm install
+
+# CloudFormationテンプレート生成
+cdk synth
+
+# 全スタックをデプロイ
+cdk deploy --all
+
+# または個別にデプロイ
+cdk deploy SlackIssueAgentSharedStack
+cdk deploy SlackIssueAgentAgentCoreStack
+cdk deploy SlackIssueAgentLambdaStack
+```
+
+### ステップ 4: Lambda Function URL の取得と設定
+
+```bash
+# Lambda Function URLを取得
+aws cloudformation describe-stacks \
+  --stack-name SlackIssueAgentLambdaStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`FunctionUrl`].OutputValue' \
+  --output text \
+  --region ap-northeast-1
+```
+
+このURLを Slack App Dashboard の **Event Subscriptions** → **Request URL** に設定します。
+
+### ステップ 5: 動作確認
+
+```bash
+# CloudWatch Logsでログ確認
+aws logs tail /aws/lambda/SlackIssueAgent-SlackEventsHandler --follow --region ap-northeast-1
+
+# Slackでボットにメンション
+# 例: @YourBot こんにちは
+```
+
+---
+
 ## 技術スタック
 
 ### 実装済み
