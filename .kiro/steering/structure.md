@@ -12,9 +12,18 @@
 **Purpose**: AWS CDKによるインフラ定義（TypeScript）
 **Example**:
 
-- `bin/`: CDKアプリエントリーポイント
-- `lib/`: Stack定義（AgentCore, API Gateway, etc.）
+- `bin/cdk.ts`: CDKアプリエントリーポイント
+- `lib/`: Stack定義
+  - `shared-stack.ts`: S3 Bucket（暗号化、Agent Code）
+  - `agentcore-stack.ts`: AgentCore Runtime + ECR Repository + IAM Role
+  - `lambda-stack.ts`: Lambda Function + Function URL + IAM Role
 - `package.json`: Node.js 22+依存関係
+
+**Stack分離パターン**:
+
+- SharedStack → AgentCoreStack → LambdaStack の依存関係
+- 各Stackは独立デプロイ可能（変更範囲の最小化）
+- CloudFormation Outputsで明示的な依存関係を定義
 
 ### Agent (`/agent/`)
 
@@ -38,7 +47,14 @@
 
 **Location**: `/lambda/`
 **Purpose**: Slack Events Handler等のLambda関数
-**Example**: 現在は空（CDK inline implementationを想定）
+**Example**:
+
+- `slack-events-handler/`: Slack Events API処理
+  - `handler.py`: メインハンドラー（署名検証、イベント振り分け）
+  - `slack_signature.py`: HMAC-SHA256署名検証
+  - `agentcore_client.py`: AgentCore Runtime呼び出し
+  - `ssm_client.py`: SSM Parameter Store統合
+  - `tests/`: pytest単体テスト（19 tests）
 
 ### Documentation (`/doc/`)
 

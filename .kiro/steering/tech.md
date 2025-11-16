@@ -56,10 +56,23 @@
 ### Common Commands
 
 ```bash
-# Setup: mise run setup
-# Test: mise run test
-# CDK Deploy: cd cdk && npm run cdk deploy
-# Agent Build: cd agent && docker buildx build --platform linux/arm64
+# Setup
+mise run setup
+
+# Test
+mise run test
+
+# Deployment (Step-by-Step)
+# 1. SSM Parameter Store設定（初回のみ）
+aws ssm put-parameter --name "/slack-issue-agent/slack/bot-token" \
+  --value "xoxb-TOKEN" --type "SecureString" --region ap-northeast-1
+
+# 2. CDKデプロイ
+cd cdk && cdk deploy --all
+
+# 3. Dockerイメージビルド & ECRプッシュ
+mise run docker:build-and-push
+# または: cd agent && docker buildx build --platform linux/arm64
 ```
 
 ## Key Technical Decisions
@@ -83,6 +96,18 @@ Canvas統合に注力し、実装複雑度を低減。Canvasが編集可能な�
 ### Docker-outside-of-docker採用
 
 Dev Containerで `docker-outside-of-docker` Feature を使用し、ホストのDockerソケットを共有。Docker-in-Dockerより軽量でビルドキャッシュ共有可能
+
+### AgentCore Container Deployment採用
+
+**決定**: ECRコンテナデプロイを採用（当初のZipデプロイから変更）
+
+**理由**:
+
+- AWS CDK `@aws-cdk/aws-bedrock-agentcore-alpha` v2.224.0時点でZipデプロイ未対応
+- コンテナベースのデプロイパターンが充実
+- ARM64イメージビルド（`docker buildx`）によるAgentCore Runtime最適化
+
+**将来の検討**: CDK Zipサポート追加時の移行（Issue #8で管理）
 
 ---
 
