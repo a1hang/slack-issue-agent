@@ -1,0 +1,9 @@
+# Lambda runtime dependencies
+# Note: boto3 is pre-installed in Lambda Python 3.12 runtime,
+# but we specify versions for local testing and consistency
+
+boto3>=1.35.0
+
+# Testing dependencies (not deployed to Lambda)
+pytest>=8.0.0
+pytest-mock>=3.12.0
