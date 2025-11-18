@@ -2,6 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ecr from "aws-cdk-lib/aws-ecr";
+import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as agentcore from "@aws-cdk/aws-bedrock-agentcore-alpha";
 import { Construct } from "constructs";
 import * as path from "path";
@@ -17,19 +18,23 @@ export interface AgentCoreStackProps extends cdk.StackProps {
  * - AgentCore Runtime: Strands Agent の実行環境 (コンテナベース)
  * - IAM Role: AgentCore 実行用 (Bedrock, SSM, CloudWatch 権限)
  * - ECR Repository: Agent コンテナイメージ保存
+ * - Docker Image Asset: agent/Dockerfile の自動ビルド&プッシュ
  *
- * デプロイ方式: ECR + Docker コンテナベース
- * - AWS CDK AgentCore alpha版 (v2.224.0+) はコンテナデプロイのみサポート
- * - 将来的な Direct Code Deployment (Zip) サポートについては GitHub Issue #8 を参照
+ * デプロイ自動化:
+ * - CDK が Dockerfile を自動的にビルド (ARM64)
+ * - 自動生成されるECRリポジトリにプッシュ
+ * - AgentCore Runtime に自動的にイメージURIを設定
+ * - `cdk deploy --all` 一発で完全デプロイ可能
  *
  * セキュリティ: AWS Well-Architected Framework - Security Pillar
  * - 最小権限の原則 (IAM Policy with explicit Resource ARN)
  * - 保管時・転送時のデータ暗号化
  * - ログとモニタリングの有効化
+ * - ECRイメージスキャン有効化（脆弱性検出）
  */
 export class AgentCoreStack extends cdk.Stack {
   public readonly agentRuntime: agentcore.Runtime;
-  public readonly agentRepository: ecr.Repository;
+  public readonly agentRepository: ecr.IRepository;
 
   constructor(scope: Construct, id: string, props: AgentCoreStackProps) {
     super(scope, id, props);
@@ -37,18 +42,19 @@ export class AgentCoreStack extends cdk.Stack {
     const { agentCodeBucket } = props;
 
     // ECR Repository for Agent Container Images
-    // Agent のDockerイメージを保存
+    // CDKで作成・管理し、削除時もリポジトリを保持（RETAIN ポリシー）
     this.agentRepository = new ecr.Repository(this, "AgentRepository", {
       repositoryName: "slack-issue-agent",
-      // イメージスキャン有効化 (セキュリティベストプラクティス)
+      // イメージスキャンを有効化（セキュリティベストプラクティス）
       imageScanOnPush: true,
-      // Removal Policy: RETAIN (誤削除防止)
+      // 削除時にリポジトリを保持（誤削除防止）
       removalPolicy: cdk.RemovalPolicy.RETAIN,
-      // 古いイメージの自動削除ルール (最新10個を保持)
+      // 古いイメージの自動削除ルール（最新3つのみ保持）
       lifecycleRules: [
         {
-          description: "Keep last 10 images",
-          maxImageCount: 10,
+          description: "Keep only the latest 3 images",
+          maxImageCount: 3,
+          rulePriority: 1,
         },
       ],
     });
@@ -68,25 +74,13 @@ export class AgentCoreStack extends cdk.Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName(
           "service-role/AWSLambdaBasicExecutionRole",
         ),
+        // Bedrock モデル呼び出しと AWS Marketplace 権限 (AWS管理ポリシー)
+        // bedrock:InvokeModel*, aws-marketplace:ViewSubscriptions, aws-marketplace:Subscribe を含む
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "AmazonBedrockLimitedAccess",
+        ),
       ],
     });
-
-    // Bedrock Model 呼び出し権限
-    // Amazon Bedrock Claude モデルへのアクセスを許可
-    // Sonnet 4.5 を使用想定だが、Claude モデルファミリー全体を許可
-    agentRole.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-        ],
-        // 明示的な Resource ARN 指定 (最小権限の原則)
-        resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/anthropic.claude-*`,
-        ],
-      }),
-    );
 
     // SSM Parameter Store 読み取り権限
     // 機密情報 (Slack Bot Token, Trello API Key/Token) を安全に取得
@@ -129,24 +123,37 @@ export class AgentCoreStack extends cdk.Stack {
       }),
     );
 
-    // AgentCore Runtime
-    // AWS Bedrock AgentCore でのコンテナベースデプロイメント
+    // AgentCore Runtime - Docker Image Asset による自動ビルド&プッシュ
+    // CDK が自動的に以下を実行:
+    // 1. agent/Dockerfile を使用して ARM64 イメージをビルド
+    // 2. ECR リポジトリにイメージをプッシュ
+    // 3. AgentCore Runtime にイメージ URI を渡す
     //
-    // デプロイ前提条件:
-    // 1. agent/ ディレクトリに Dockerfile が存在すること
-    // 2. ECR に ARM64 イメージを事前にプッシュすること
-    //
-    // ビルド・プッシュ手順:
-    // ```bash
-    // docker buildx build --platform linux/arm64 -t slack-issue-agent:latest .
-    // docker tag slack-issue-agent:latest <account>.dkr.ecr.<region>.amazonaws.com/slack-issue-agent:latest
-    // aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <account>.dkr.ecr.<region>.amazonaws.com
-    // docker push <account>.dkr.ecr.<region>.amazonaws.com/slack-issue-agent:latest
-    // ```
+    // ビルドパフォーマンス最適化:
+    // - Docker BuildKit 有効化（並列ビルド、キャッシュ最適化）
+    // - .dockerignore で不要ファイルを除外（ビルドコンテキスト削減）
+    const agentDockerImage = new ecr_assets.DockerImageAsset(
+      this,
+      "AgentDockerImage",
+      {
+        directory: path.join(__dirname, "../../agent"),
+        platform: ecr_assets.Platform.LINUX_ARM64,
+        // ビルド時引数（必要に応じて追加）
+        // buildArgs: {
+        //   PYTHON_VERSION: "3.12",
+        // },
+      },
+    );
+
+    // DockerImageAssetが自動生成したリポジトリとイメージタグを使用
+    // repository.repositoryArn はトークンなので fromRepositoryAttributes を使用
     const agentRuntimeArtifact =
       agentcore.AgentRuntimeArtifact.fromEcrRepository(
-        this.agentRepository,
-        "latest", // イメージタグ
+        ecr.Repository.fromRepositoryAttributes(this, "AgentImageRepository", {
+          repositoryArn: agentDockerImage.repository.repositoryArn,
+          repositoryName: agentDockerImage.repository.repositoryName,
+        }),
+        agentDockerImage.imageTag,
       );
 
     this.agentRuntime = new agentcore.Runtime(this, "SlackIssueAgentRuntime", {
@@ -154,7 +161,8 @@ export class AgentCoreStack extends cdk.Stack {
       runtimeName: "slack_issue_agent_runtime",
       agentRuntimeArtifact: agentRuntimeArtifact,
       executionRole: agentRole,
-      description: "Slack Issue Agent - Bedrock AgentCore Runtime",
+      description:
+        "Slack Issue Agent - AgentCore Runtime with explicit region config",
 
       // Network Configuration: Public Network Mode (VPC 不使用)
       // AgentCore が外部 API (Slack, Trello) にアクセスするため、Public Network を使用
@@ -169,7 +177,8 @@ export class AgentCoreStack extends cdk.Stack {
       // 機密情報は SSM Parameter Store から実行時に取得
       environmentVariables: {
         LOG_LEVEL: "INFO",
-        // AWS_REGION は AgentCore runtime で自動的に利用可能
+        // AWS_REGION を明示的に設定 (Bedrock クライアントのリージョン指定用)
+        AWS_REGION: this.region,
       },
     });
 

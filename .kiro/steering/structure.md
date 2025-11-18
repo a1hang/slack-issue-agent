@@ -32,16 +32,22 @@
 **Example**:
 
 - `src/slack_issue_agent/`: エージェントロジック
+  - `agentcore_app.py`: AgentCore エントリーポイント（BedrockAgentCoreApp統合）
+  - `__main__.py`: ローカル実行用モジュール
 - `tests/`: pytest テスト（環境検証、統合テスト、セキュリティテスト）
 - `pyproject.toml`: Python 3.12+依存関係
-- `Dockerfile`: ARM64コンテナ定義（AgentCore用）
+- `Dockerfile`: ARM64マルチステージビルド（AgentCore用）
+- `scripts/`: ビルド・デプロイ自動化スクリプト
+  - `build-and-push-ecr.sh`: ECRへのイメージプッシュ自動化
+- `LOCAL_TESTING.md`: ローカルテスト手順
+- `test-payloads/`: テスト用JSONペイロード
 
 **Test Organization Pattern**:
 
 - 環境検証: `test_tool_versions.py`, `test_dependencies.py`, `test_cdk_build_lint.py`
 - AWS統合: `test_aws_connection.py`, `test_cdk_bootstrap.py`, `test_assume_role.py`
 - セキュリティ: `test_git_secrets.py`, `test_git_secrets_blocking.py`
-- 統合テスト: `test_integration.py`, `test_slack_client.py`
+- 統合テスト: `test_integration.py`, `test_slack_client.py`, `test_agentcore_app.py`
 
 ### Lambda Functions (`/lambda/`)
 
@@ -56,15 +62,17 @@
   - `ssm_client.py`: SSM Parameter Store統合
   - `tests/`: pytest単体テスト（19 tests）
 
-### Documentation (`/doc/`)
+### Documentation
 
-**Location**: `/doc/`
-**Purpose**: プロジェクト詳細ドキュメント
-**Example**:
+**Root Level**:
 
-- `README.md`: プロジェクト概要
-- `PROJECT_OVERVIEW.md`: 技術詳細
-- `IMPLEMENTATION_GUIDE.md`: 実装ガイド
+- `README.md`: プロジェクト概要、セットアップ、デプロイ手順
+- `DEPLOYMENT_GUIDE.md`: 詳細デプロイガイド（IAM権限、SSM設定、トラブルシューティング）
+
+**Component-specific**:
+
+- `agent/LOCAL_TESTING.md`: AgentCoreローカルテスト手順
+- `lambda/slack-events-handler/README.md`: Lambda実装詳細（必要に応じて）
 
 ### Kiro Specs (`/.kiro/`)
 
@@ -116,7 +124,24 @@ import { AgentCoreStack } from "./lib/agentcore-stack";
 - **単一責任**: 各ディレクトリは明確な境界を持つ（infra, agent, lambda）
 - **疎結合**: Agent実装はCDK定義に依存せず、独立してテスト・開発可能
 - **デプロイ独立性**: CDKデプロイとAgentコンテナビルドは別プロセス
+- **ドキュメント配置**: コンポーネント固有のドキュメントはコンポーネントディレクトリ内に配置（例: `agent/LOCAL_TESTING.md`）
+
+## Testing Patterns
+
+### Local Development & Testing
+
+**AgentCore Local Testing**:
+
+- HTTP サーバーモード（localhost:8080）でローカル実行
+- `/invocations` エンドポイントへの POST リクエストでテスト
+- `test-payloads/` ディレクトリにサンプルペイロードを配置
+
+**Lambda Unit Testing**:
+
+- `lambda/slack-events-handler/tests/` にpytestベーステスト
+- 署名検証、イベント処理、AgentCore統合の単体テスト
 
 ---
 
 _Document patterns, not file trees. New files following patterns shouldn't require updates_
+_Updated: 2025-11-17 - Added AgentCore entrypoint structure, testing patterns, documentation organization_

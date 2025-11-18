@@ -9,17 +9,36 @@ References:
     - AgentCore Deployment: https://aws.github.io/bedrock-agentcore-starter-toolkit/
 """
 
+import os
 from typing import Any
 
+import boto3  # type: ignore[import-untyped]
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # type: ignore[import-not-found]
 from strands import Agent
+from strands.models import BedrockModel
 
 # Initialize BedrockAgentCoreApp for AgentCore Runtime integration
 app = BedrockAgentCoreApp()
 
-# Configure agent with Claude Sonnet 4.5 model
+# Get AWS region from environment variable (set by AgentCore Runtime)
+# Fallback to ap-northeast-1 if not set
+region = os.environ.get("AWS_REGION", "ap-northeast-1")
+
+# Create boto3 session with explicit region
+# This ensures Bedrock client uses ap-northeast-1
+boto_session = boto3.Session(region_name=region)
+
+# Configure Bedrock model with JP Geographic Inference Profile
+# Japan-specific CRIS routes between Tokyo (ap-northeast-1) and Osaka (ap-northeast-3)
+# Data stays within Japan for compliance requirements
+bedrock_model = BedrockModel(
+    model_id="jp.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    boto_session=boto_session,
+)
+
+# Configure agent with Bedrock model
 agent = Agent(
-    model="anthropic.claude-sonnet-4-5-20250929-v1:0",
+    model=bedrock_model,
     system_prompt=(
         "あなたは Slack Issue Agent です。"
         "ユーザーとの自然な会話を通じて Issue 情報を収集し、"

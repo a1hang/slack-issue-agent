@@ -1495,7 +1495,7 @@ requires-dist = [
     { name = "bedrock-agentcore" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "slack-sdk", specifier = ">=3.0.0" },
-    { name = "strands-agents", specifier = ">=1.15.0" },
+    { name = "strands-agents", specifier = "==1.15.0" },
     { name = "strands-agents-tools", specifier = ">=0.2.14" },
 ]
 

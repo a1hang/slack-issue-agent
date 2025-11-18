@@ -98,9 +98,34 @@ class AgentCoreClient:
                     qualifier="DEFAULT",
                 )
 
-                # Parse response payload
-                result = json.loads(response["payload"])
-                return {"result": result.get("result", ""), "sessionId": session_id}
+                # Parse streaming or JSON response
+                content_type = response.get("contentType", "")
+
+                if "text/event-stream" in content_type:
+                    # Handle streaming response
+                    content = []
+                    for line in response["response"].iter_lines(chunk_size=10):
+                        if line:
+                            line_str = line.decode("utf-8")
+                            if line_str.startswith("data: "):
+                                content.append(line_str[6:])
+                    result_text = "\n".join(content)
+                    return {"result": result_text, "sessionId": session_id}
+
+                elif content_type == "application/json":
+                    # Handle standard JSON response
+                    content = []
+                    for chunk in response.get("response", []):
+                        content.append(chunk.decode("utf-8"))
+                    result_data = json.loads("".join(content))
+                    return {
+                        "result": result_data.get("result", str(result_data)),
+                        "sessionId": session_id,
+                    }
+
+                else:
+                    # Unknown content type
+                    raise RuntimeError(f"Unsupported content type: {content_type}")
 
             except ClientError as e:
                 error_code = e.response["Error"]["Code"]

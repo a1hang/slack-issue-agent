@@ -4,24 +4,28 @@ import { SharedStack } from "../lib/shared-stack";
 import { AgentCoreStack } from "../lib/agentcore-stack";
 import { LambdaStack } from "../lib/lambda-stack";
 
+console.log("[DEBUG] CDK app starting...");
+
 /**
  * Slack Issue Agent - CDK Application
  *
  * このアプリケーションは以下の3つのStackで構成されます:
  * 1. SharedStack: S3 Bucket (Agent コードデプロイ用)
- * 2. AgentCoreStack: AgentCore Runtime + IAM Role + ECR Repository
+ * 2. AgentCoreStack: AgentCore Runtime + IAM Role + ECR Repository + Docker Image Asset
  * 3. LambdaStack: Lambda Function + Function URL + IAM Role
  *
  * Stack 依存関係:
  * LambdaStack → AgentCoreStack → SharedStack
  *
- * デプロイ順序:
- * cdk deploy SlackIssueAgentSharedStack
- * cdk deploy SlackIssueAgentAgentCoreStack
- * cdk deploy SlackIssueAgentLambdaStack
+ * デプロイ自動化:
+ * - CDKが自動的にDockerイメージをビルド&プッシュ
+ * - SSM Parameter Storeの事前設定のみ必要
+ * - `cdk deploy --all` 一発で完全デプロイ
  *
- * または一括デプロイ:
- * cdk deploy --all
+ * デプロイ前提条件:
+ * 1. SSM Parameter Store設定 (DEPLOYMENT_GUIDE.md 参照)
+ * 2. Docker デーモンが起動していること
+ * 3. AWS CLI認証設定完了
  */
 
 const app = new cdk.App();
@@ -29,8 +33,10 @@ const app = new cdk.App();
 // AWS アカウント・リージョン設定
 // CDK デプロイ環境を環境変数から取得
 // デフォルトリージョン: ap-northeast-1 (東京)
+// account が未設定の場合は undefined にして CDK に自動検出させる
 const env = {
-  account: process.env.CDK_DEFAULT_ACCOUNT || process.env.AWS_ACCOUNT_ID,
+  account:
+    process.env.CDK_DEFAULT_ACCOUNT || process.env.AWS_ACCOUNT_ID || undefined,
   region:
     process.env.CDK_DEFAULT_REGION ||
     process.env.AWS_REGION ||

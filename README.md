@@ -239,38 +239,14 @@ Required SSM Parameters:
 Please create these parameters using the AWS CLI commands in the README.
 ```
 
-### ステップ 2: Dockerイメージのビルドとプッシュ
+### ステップ 2: CDK デプロイ（自動ビルド&プッシュ）
 
-AgentCore用のDockerイメージをビルドし、ECRにプッシュします。
+CDKが自動的にDockerイメージのビルドとECRプッシュを実行します。
 
-```bash
-# ECRリポジトリURIを取得（CDKデプロイ後）
-export ECR_REPO_URI=$(aws cloudformation describe-stacks \
-  --stack-name SlackIssueAgentAgentCoreStack \
-  --query 'Stacks[0].Outputs[?OutputKey==`AgentRepositoryUri`].OutputValue' \
-  --output text \
-  --region ap-northeast-1)
+**前提条件**:
 
-# ECRログイン
-aws ecr get-login-password --region ap-northeast-1 | \
-  docker login --username AWS --password-stdin $ECR_REPO_URI
-
-# ARM64イメージをビルド
-cd agent
-docker buildx build --platform linux/arm64 -t slack-issue-agent:latest .
-
-# タグ付けとプッシュ
-docker tag slack-issue-agent:latest $ECR_REPO_URI:latest
-docker push $ECR_REPO_URI:latest
-```
-
-**miseタスクを使用する場合**:
-
-```bash
-mise run docker:build-and-push
-```
-
-### ステップ 3: CDK デプロイ
+- Docker デーモンが起動していること
+- AWS CLI 認証設定が完了していること
 
 ```bash
 cd cdk
@@ -278,19 +254,23 @@ cd cdk
 # CDK依存関係をインストール
 npm install
 
-# CloudFormationテンプレート生成
-cdk synth
-
-# 全スタックをデプロイ
+# 全スタックをデプロイ（Dockerビルド&プッシュも自動実行）
 cdk deploy --all
-
-# または個別にデプロイ
-cdk deploy SlackIssueAgentSharedStack
-cdk deploy SlackIssueAgentAgentCoreStack
-cdk deploy SlackIssueAgentLambdaStack
 ```
 
-### ステップ 4: Lambda Function URL の取得と設定
+**デプロイ中に実行される処理**:
+
+1. SharedStack デプロイ（S3 Bucket作成）
+2. AgentCoreStack デプロイ
+   - ECR Repository 作成
+   - **Dockerイメージ自動ビルド** (ARM64、agent/Dockerfile)
+   - **ECRに自動プッシュ**
+   - AgentCore Runtime 作成
+3. LambdaStack デプロイ（Lambda Function + Function URL作成）
+
+**初回デプロイ時間**: 約5-10分（Dockerビルド含む）
+
+### ステップ 3: Lambda Function URL の取得と設定
 
 ```bash
 # Lambda Function URLを取得
@@ -303,7 +283,7 @@ aws cloudformation describe-stacks \
 
 このURLを Slack App Dashboard の **Event Subscriptions** → **Request URL** に設定します。
 
-### ステップ 5: 動作確認
+### ステップ 4: 動作確認
 
 ```bash
 # CloudWatch Logsでログ確認

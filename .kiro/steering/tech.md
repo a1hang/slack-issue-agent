@@ -22,6 +22,7 @@
 ### Agent (Python)
 
 - `strands-agents`: エージェントフレームワーク
+- `bedrock-agentcore`: AgentCore Runtime統合
 - `slack-sdk`: Slack API操作（Canvas含む）
 - `httpx`: 非同期HTTP通信（Trello API）
 
@@ -42,6 +43,7 @@
 - **Python**: pytest（単体・統合テスト）
 - **TypeScript**: Jest
 - **Environment Verification**: ツールバージョン、依存関係、ビルド、AWS接続の自動検証テスト
+- **Local Testing**: AgentCore HTTP サーバー（localhost:8080）でのローカルテスト
 
 ## Development Environment
 
@@ -62,18 +64,18 @@ mise run setup
 # Test
 mise run test
 
-# Deployment (Step-by-Step)
-# 1. SSM Parameter Store設定（初回のみ）
-aws ssm put-parameter --name "/slack-issue-agent/slack/bot-token" \
-  --value "xoxb-TOKEN" --type "SecureString" --region ap-northeast-1
+# Local Testing (AgentCore HTTP server on localhost:8080)
+mise run agent:local
 
-# 2. CDKデプロイ
-cd cdk && cdk deploy --all
+# Docker Build & Deployment
+mise run agent:build   # Build ARM64 image locally
+mise run agent:push    # Build and push to ECR
 
-# 3. Dockerイメージビルド & ECRプッシュ
-mise run docker:build-and-push
-# または: cd agent && docker buildx build --platform linux/arm64
+# CDK Deployment
+cd cdk && npx cdk deploy --all
 ```
+
+**デプロイ前提条件**: SSM Parameter Store設定（詳細は DEPLOYMENT_GUIDE.md 参照）
 
 ## Key Technical Decisions
 
@@ -88,6 +90,16 @@ mise run docker:build-and-push
 - AWS推奨Pythonエージェントフレームワーク
 - AgentCoreとのネイティブ統合
 - シンプルなツール定義とデプロイモデル
+
+### Geographic Inference Profile (Japan)
+
+**決定**: Claude Sonnet 4.5 の日本地域推論プロファイル `jp.anthropic.claude-sonnet-4-5-20250929-v1:0` を採用
+
+**理由**:
+
+- **Cross-Region Inference System (CRIS)**: 東京（ap-northeast-1）と大阪（ap-northeast-3）間で自動ルーティング
+- **データローカライゼーション**: すべてのデータが日本国内に留まり、コンプライアンス要件を満たす
+- **可用性向上**: リージョン障害時の自動フェイルオーバー
 
 ### Block Kit非採用
 
@@ -109,6 +121,20 @@ Dev Containerで `docker-outside-of-docker` Feature を使用し、ホストのD
 
 **将来の検討**: CDK Zipサポート追加時の移行（Issue #8で管理）
 
+### Multi-stage Docker Build
+
+**パターン**: uvのARM64公式イメージを使用した2段階ビルド
+
+**Stage 1 (builder)**: 依存関係インストール（uv sync）
+**Stage 2 (runtime)**: 最小限のプロダクションイメージ（.venvとソースコードのみ）
+
+**メリット**:
+
+- イメージサイズの最小化（ビルドツール不要）
+- uv による高速依存関係インストール
+- セキュリティ強化（不要なツール削除）
+
 ---
 
 _Document standards and patterns, not every dependency_
+_Updated: 2025-11-17 - Added Geographic Inference Profile, Local Testing, Multi-stage Docker Build patterns_

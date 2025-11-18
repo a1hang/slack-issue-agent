@@ -58,8 +58,8 @@ export class LambdaStack extends cdk.Stack {
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["bedrock-agentcore:InvokeAgentRuntime"],
-        // 明示的な Resource ARN 指定 (最小権限の原則)
-        resources: [agentRuntimeArn],
+        // AgentCore Runtime と runtime-endpoint へのアクセスを許可
+        resources: [agentRuntimeArn, `${agentRuntimeArn}/*`],
       }),
     );
 
@@ -92,6 +92,15 @@ export class LambdaStack extends cdk.Stack {
       }),
     );
 
+    // CloudWatch Logs Group
+    // AWS Well-Architected Operational Excellence Pillar: ログの長期保存
+    // コンプライアンス・監査・トラブルシューティングのため、90日保持
+    const logGroup = new logs.LogGroup(this, "SlackEventsHandlerLogGroup", {
+      logGroupName: "/aws/lambda/SlackIssueAgent-SlackEventsHandler",
+      retention: logs.RetentionDays.THREE_MONTHS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Lambda Function
     // Slack Events API からのリクエストを受け取り、AgentCore Runtime に転送
     this.slackEventsHandler = new lambda.Function(this, "SlackEventsHandler", {
@@ -101,9 +110,11 @@ export class LambdaStack extends cdk.Stack {
       code: lambda.Code.fromAsset("../lambda/slack-events-handler"),
       role: lambdaRole,
 
-      // Timeout: 30秒 (Slack Events API は 3秒以内に HTTP 200 応答を期待)
-      // Lambda は即座に応答し、AgentCore 呼び出しは非同期で実行
-      timeout: cdk.Duration.seconds(30),
+      // Timeout: 90秒 (AgentCore 処理完了を待機)
+      // 注: Slack Events API は 3秒以内に HTTP 200 応答を期待するが、
+      //     現在は同期処理のため AgentCore のレスポンスを待つ必要がある
+      //     将来的には AgentCore Gateway 経由で非同期化を検討
+      timeout: cdk.Duration.seconds(90),
 
       // Memory: 512MB (Slack 署名検証とイベント転送に十分)
       memorySize: 512,
@@ -123,10 +134,8 @@ export class LambdaStack extends cdk.Stack {
         // AWS_REGION は Lambda runtime で自動的に設定される
       },
 
-      // CloudWatch Logs 保持期間設定
-      // AWS Well-Architected Operational Excellence Pillar: ログの長期保存
-      // コンプライアンス・監査・トラブルシューティングのため、90日保持
-      logRetention: logs.RetentionDays.THREE_MONTHS,
+      // CloudWatch Logs Group (logRetention は非推奨)
+      logGroup: logGroup,
     });
 
     // Lambda Function URL

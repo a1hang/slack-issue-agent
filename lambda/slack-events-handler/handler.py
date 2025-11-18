@@ -21,6 +21,7 @@ import re
 from typing import Any
 
 from agentcore_client import AgentCoreClient
+from slack_sdk import WebClient
 from slack_signature import verify_slack_signature
 from ssm_client import SSMParameterStore
 
@@ -108,6 +109,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         # 4. Parse payload
         payload = json.loads(body)
+        logger.info(f"Received payload type: {payload.get('type')}")
+        logger.debug(f"Full payload structure: {json.dumps(payload, indent=2)}")
 
         # 5. Handle URL verification
         if payload.get("type") == "url_verification":
@@ -117,16 +120,73 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 "body": json.dumps({"challenge": payload["challenge"]}),
             }
 
-        # 6. Invoke AgentCore
+        # 6. Extract event data safely
+        event = payload.get("event")
+        if not event:
+            logger.error(
+                f"No 'event' key in payload. Payload keys: {list(payload.keys())}"
+            )
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing 'event' key in payload"}),
+            }
+
+        # Ignore bot's own messages to prevent infinite loops
+        if event.get("bot_id"):
+            logger.info("Ignoring bot message to prevent loops")
+            return {"statusCode": 200, "body": json.dumps({"ok": True})}
+
+        event_text = event.get("text")
+        if not event_text:
+            logger.error(
+                f"No 'text' field in event. Event type: {event.get('type')}, "
+                f"Event keys: {list(event.keys())}"
+            )
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing 'text' field in event"}),
+            }
+
+        channel = event.get("channel")
+        if not channel:
+            logger.error("No 'channel' field in event")
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing 'channel' field in event"}),
+            }
+
+        # 7. Invoke AgentCore
         agent_arn = os.environ["AGENTCORE_RUNTIME_ARN"]
-        client = AgentCoreClient(agent_arn)
+        agentcore_client = AgentCoreClient(agent_arn)
 
-        event_text = payload["event"]["text"]
-        result = client.invoke(prompt=event_text)
+        result = agentcore_client.invoke(prompt=event_text)
 
-        logger.info(f"AgentCore response: {mask_sensitive_data(result['result'])}")
+        # Convert result to string if it's a dict for logging
+        result_text = result.get("result", "")
+        if isinstance(result_text, dict):
+            result_text = json.dumps(result_text)
+        logger.info(f"AgentCore response: {mask_sensitive_data(result_text)}")
 
-        # 7. Return acknowledgment (Slack requires 200 within 3 seconds)
+        # 8. Send response back to Slack
+        ssm = SSMParameterStore()
+        bot_token = ssm.get_parameter("/slack-issue-agent/slack/bot-token")
+        slack_client = WebClient(token=bot_token)
+
+        # Parse AgentCore response to extract text content
+        response_text = result_text
+        if isinstance(result.get("result"), dict):
+            # Extract text from Strands Agent response format
+            content = result.get("result", {}).get("content", [])
+            if content and isinstance(content, list):
+                response_text = "\n".join(
+                    item.get("text", "") for item in content if item.get("text")
+                )
+
+        slack_client.chat_postMessage(
+            channel=channel, text=response_text or "処理が完了しました。"
+        )
+
+        # 9. Return acknowledgment (Slack requires 200 within 3 seconds)
         return {"statusCode": 200, "body": json.dumps({"ok": True})}
 
     except json.JSONDecodeError as e:
