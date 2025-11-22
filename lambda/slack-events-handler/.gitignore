@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+
+# Installed dependencies (in lib/python/)
+lib/
+
+# Testing dependencies (not for Lambda)
+pytest/
+pytest-*.dist-info/
+pytest_mock/
+pytest_mock-*.dist-info/
+pluggy/
+pluggy-*.dist-info/
+iniconfig/
+iniconfig-*.dist-info/
+_pytest/
+pygments/
+pygments-*.dist-info/
+py.py
+bin/
+
+# Pytest
+.pytest_cache/
+
+# Misc
+.lock

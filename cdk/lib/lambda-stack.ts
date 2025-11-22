@@ -107,7 +107,19 @@ export class LambdaStack extends cdk.Stack {
       // Python 3.12 ランタイム (AWS推奨の最新安定版)
       runtime: lambda.Runtime.PYTHON_3_12,
       handler: "handler.lambda_handler",
-      code: lambda.Code.fromAsset("../lambda/slack-events-handler"),
+      // ソースコードと依存関係を含むアセット
+      // 依存関係は lib/python/ に事前インストール済み
+      // exclude で不要なファイル (テスト、仮想環境) を除外
+      code: lambda.Code.fromAsset("../lambda/slack-events-handler", {
+        exclude: [
+          "tests",
+          ".venv",
+          "__pycache__",
+          "*.pyc",
+          ".pytest_cache",
+          "requirements-dev.txt",
+        ],
+      }),
       role: lambdaRole,
 
       // Timeout: 90秒 (AgentCore 処理完了を待機)

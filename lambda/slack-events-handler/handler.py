@@ -13,10 +13,15 @@ Reference:
     Slack Events API: https://api.slack.com/apis/connections/events-api
 """
 
+# Add lib/python to sys.path for dependencies
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "lib", "python"))
+
 import base64
 import json
 import logging
-import os
 import re
 from typing import Any
 
