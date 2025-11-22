@@ -60,19 +60,23 @@
   - `slack_signature.py`: HMAC-SHA256署名検証
   - `agentcore_client.py`: AgentCore Runtime呼び出し
   - `ssm_client.py`: SSM Parameter Store統合
-  - `tests/`: pytest単体テスト（19 tests）
+  - `lib/python/`: 依存関係インストール先（sys.pathで参照）
+  - `tests/`: pytest単体・統合テスト
 
 ### Documentation
 
 **Root Level**:
 
-- `README.md`: プロジェクト概要、セットアップ、デプロイ手順
-- `DEPLOYMENT_GUIDE.md`: 詳細デプロイガイド（IAM権限、SSM設定、トラブルシューティング）
+- `README.md`: プロジェクト概要、セットアップ、クイックスタート
 
 **Component-specific**:
 
+- `cdk/README.md`: CDKデプロイガイド（SSM設定、トラブルシューティング含む）
 - `agent/LOCAL_TESTING.md`: AgentCoreローカルテスト手順
-- `lambda/slack-events-handler/README.md`: Lambda実装詳細（必要に応じて）
+
+**Archive**:
+
+- `_archive/`: 過去のドキュメント（参照用）
 
 ### Kiro Specs (`/.kiro/`)
 
@@ -144,4 +148,4 @@ import { AgentCoreStack } from "./lib/agentcore-stack";
 ---
 
 _Document patterns, not file trees. New files following patterns shouldn't require updates_
-_Updated: 2025-11-17 - Added AgentCore entrypoint structure, testing patterns, documentation organization_
+_Updated: 2025-11-22 - Added Lambda lib/python dependency pattern_

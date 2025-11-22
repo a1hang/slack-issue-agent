@@ -16,8 +16,15 @@
 
 ### Infrastructure (CDK)
 
-- `@aws-cdk/aws-bedrock-agentcore-alpha`: AgentCore構築
-- `aws-cdk-lib`: 標準AWSリソース定義
+- `aws-cdk-lib` (2.227.0): 標準AWSリソース定義
+- `@aws-cdk/aws-bedrock-agentcore-alpha` (2.224.0): AgentCore構築
+- `cdk-ecr-deployment`: DockerImageAssetからECRリポジトリへのイメージデプロイ
+
+### Lambda (Python)
+
+- 依存関係は `lib/python/` ディレクトリにインストール
+- `sys.path` 設定でランタイムから参照
+- `uv pip install --target lib/python/` でインストール
 
 ### Agent (Python)
 
@@ -71,9 +78,11 @@ mise run agent:local
 mise run agent:build   # Build ARM64 image locally
 mise run agent:push    # Build and push to ECR
 
-# CDK Deployment
-cd cdk && npx cdk deploy --all
+# CDK Deployment (global CLI)
+cd cdk && cdk deploy --all
 ```
+
+**Note**: CDK CLIはグローバルインストール (`npm install -g aws-cdk@latest`) を推奨。現在v2.1033.0を使用。
 
 **デプロイ前提条件**: SSM Parameter Store設定（詳細は DEPLOYMENT_GUIDE.md 参照）
 
@@ -121,6 +130,16 @@ Dev Containerで `docker-outside-of-docker` Feature を使用し、ホストのD
 
 **将来の検討**: CDK Zipサポート追加時の移行（Issue #8で管理）
 
+### ECRDeployment パターン
+
+**決定**: `cdk-ecr-deployment` を使用してDockerImageAssetから専用ECRリポジトリにイメージをコピー
+
+**理由**:
+
+- **イメージ管理**: 自分で管理するECRリポジトリでタグとライフサイクルを制御
+- **デプロイ順序**: `node.addDependency()` で AgentCore Runtime がイメージ存在後に作成されることを保証
+- **RETAIN ポリシー**: スタック削除時もECRリポジトリを保持（誤削除防止）
+
 ### Multi-stage Docker Build
 
 **パターン**: uvのARM64公式イメージを使用した2段階ビルド
@@ -137,4 +156,4 @@ Dev Containerで `docker-outside-of-docker` Feature を使用し、ホストのD
 ---
 
 _Document standards and patterns, not every dependency_
-_Updated: 2025-11-17 - Added Geographic Inference Profile, Local Testing, Multi-stage Docker Build patterns_
+_Updated: 2025-11-22 - Added cdk-ecr-deployment, Lambda lib/python pattern, global CDK CLI_
