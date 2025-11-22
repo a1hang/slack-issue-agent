@@ -3,6 +3,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
+import * as ecrdeploy from "cdk-ecr-deployment";
 import * as agentcore from "@aws-cdk/aws-bedrock-agentcore-alpha";
 import { Construct } from "constructs";
 import * as path from "path";
@@ -145,15 +146,24 @@ export class AgentCoreStack extends cdk.Stack {
       },
     );
 
-    // DockerImageAssetが自動生成したリポジトリとイメージタグを使用
-    // repository.repositoryArn はトークンなので fromRepositoryAttributes を使用
+    // ECRDeployment: DockerImageAsset から専用リポジトリにイメージをコピー
+    // これにより、自分で管理するECRリポジトリでイメージタグやライフサイクルを制御できる
+    const ecrDeployment = new ecrdeploy.ECRDeployment(
+      this,
+      "DeployAgentImage",
+      {
+        src: new ecrdeploy.DockerImageName(agentDockerImage.imageUri),
+        dest: new ecrdeploy.DockerImageName(
+          `${this.agentRepository.repositoryUri}:latest`,
+        ),
+      },
+    );
+
+    // 専用ECRリポジトリの latest タグを使用
     const agentRuntimeArtifact =
       agentcore.AgentRuntimeArtifact.fromEcrRepository(
-        ecr.Repository.fromRepositoryAttributes(this, "AgentImageRepository", {
-          repositoryArn: agentDockerImage.repository.repositoryArn,
-          repositoryName: agentDockerImage.repository.repositoryName,
-        }),
-        agentDockerImage.imageTag,
+        this.agentRepository,
+        "latest",
       );
 
     this.agentRuntime = new agentcore.Runtime(this, "SlackIssueAgentRuntime", {
@@ -181,6 +191,10 @@ export class AgentCoreStack extends cdk.Stack {
         AWS_REGION: this.region,
       },
     });
+
+    // AgentCore Runtime が ECRDeployment 完了後に作成されるよう依存関係を設定
+    // これにより、イメージがリポジトリに存在することを保証
+    this.agentRuntime.node.addDependency(ecrDeployment);
 
     // CloudFormation Outputs
     // Lambda Function による AgentCore 呼び出しと、デプロイ後の確認に使用
