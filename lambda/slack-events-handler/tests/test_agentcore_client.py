@@ -20,7 +20,8 @@ def test_invoke_returns_result():
     """Test successful AgentCore invocation."""
     mock_client = Mock()
     mock_client.invoke_agent_runtime.return_value = {
-        "payload": '{"result": "Hello from agent"}'
+        "contentType": "application/json",
+        "response": [b'{"result": "Hello from agent"}'],
     }
 
     client = AgentCoreClient(
@@ -54,7 +55,10 @@ def test_throttling_retries_with_backoff():
     mock_client.invoke_agent_runtime.side_effect = [
         ClientError({"Error": {"Code": "ThrottlingException"}}, "invoke_agent_runtime"),
         ClientError({"Error": {"Code": "ThrottlingException"}}, "invoke_agent_runtime"),
-        {"payload": '{"result": "Success after retry"}'},
+        {
+            "contentType": "application/json",
+            "response": [b'{"result": "Success after retry"}'],
+        },
     ]
 
     client = AgentCoreClient(
@@ -106,7 +110,8 @@ def test_custom_session_id():
     """Test custom session ID is used when provided."""
     mock_client = Mock()
     mock_client.invoke_agent_runtime.return_value = {
-        "payload": '{"result": "response"}'
+        "contentType": "application/json",
+        "response": [b'{"result": "response"}'],
     }
 
     client = AgentCoreClient(

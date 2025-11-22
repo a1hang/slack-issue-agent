@@ -87,7 +87,7 @@ def test_url_verification_returns_challenge():
 def test_successful_event_callback():
     """Test successful event callback processing."""
     timestamp = str(int(time.time()))
-    body = '{"type":"event_callback","event":{"text":"Hello agent"}}'
+    body = '{"type":"event_callback","event":{"text":"Hello agent","channel":"C12345"}}'
     signing_secret = "test_secret"
 
     # Generate valid signature
@@ -113,14 +113,19 @@ def test_successful_event_callback():
         "sessionId": "test-session-id",
     }
 
-    with patch("handler.SSMParameterStore.get_parameter", return_value=signing_secret):
+    mock_slack_client = Mock()
+
+    with patch("handler.SSMParameterStore") as mock_ssm:
+        mock_ssm.return_value.get_parameter.return_value = signing_secret
         with patch("handler.AgentCoreClient", return_value=mock_agentcore_client):
-            with patch.dict("os.environ", {"AGENTCORE_RUNTIME_ARN": "arn:test"}):
-                response = lambda_handler(event, Mock())
+            with patch("handler.WebClient", return_value=mock_slack_client):
+                with patch.dict("os.environ", {"AGENTCORE_RUNTIME_ARN": "arn:test"}):
+                    response = lambda_handler(event, Mock())
 
     assert response["statusCode"] == 200
     assert "ok" in response["body"]
     mock_agentcore_client.invoke.assert_called_once_with(prompt="Hello agent")
+    mock_slack_client.chat_postMessage.assert_called_once()
 
 
 def test_base64_encoded_body():
