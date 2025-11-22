@@ -1,0 +1,19 @@
+slack-issue-agent
+Copyright (c) 2025 rasse
+
+This project incorporates components from the following open source projects:
+
+================================================================================
+
+gotalab/cc-sdd
+https://github.com/gotalab/cc-sdd
+Copyright (c) 2025 gotalab
+Licensed under the MIT License
+
+The following directories contain code/prompts derived from cc-sdd:
+- .claude/commands/kiro/
+- .kiro/settings/
+
+See .claude/commands/kiro/LICENSE and .kiro/LICENSE for the full MIT license text.
+
+================================================================================

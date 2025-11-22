@@ -1,0 +1,5 @@
+# Lambda runtime dependencies
+# Note: boto3 is pre-installed in Lambda Python 3.12 runtime,
+# but we include it for consistency and newer features
+
+slack-sdk>=3.27.0

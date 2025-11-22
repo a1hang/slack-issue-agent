@@ -116,6 +116,32 @@ npm test
 
 ---
 
+## デプロイ
+
+デプロイ手順の詳細は [cdk/README.md](cdk/README.md) を参照してください。
+
+### クイックスタート
+
+1. **SSM Parameter Store 設定** - Slack/Trello認証情報を登録
+2. **CDK デプロイ** - `cd cdk && cdk deploy --all`
+3. **Slack App 設定** - Lambda Function URL を Event Subscriptions に登録
+
+```bash
+# デプロイ
+cd cdk
+npm install
+cdk deploy --all
+
+# Lambda Function URL 取得
+aws cloudformation describe-stacks \
+  --stack-name SlackIssueAgentLambdaStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`FunctionUrl`].OutputValue' \
+  --output text \
+  --region ap-northeast-1
+```
+
+---
+
 ## 技術スタック
 
 ### 実装済み
@@ -143,6 +169,14 @@ npm test
 ## ライセンス
 
 このプロジェクトは実験用プロジェクトです。
+
+### 使用しているオープンソースソフトウェア
+
+このプロジェクトは以下のオープンソースソフトウェアを使用しています:
+
+- **[gotalab/cc-sdd](https://github.com/gotalab/cc-sdd)** (MIT License)
+  - Spec-Driven Development ワークフロー (`.claude/commands/kiro/`, `.kiro/settings/`)
+  - 詳細は `NOTICE` ファイルおよび各ディレクトリの `LICENSE` ファイルを参照してください
 
 ---
 

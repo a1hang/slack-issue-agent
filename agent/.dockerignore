@@ -1,0 +1,67 @@
+# Git and version control
+.git
+.gitignore
+.github
+
+# Python cache and build artifacts
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+docs/
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+
+# Kiro specs (not needed in runtime)
+.kiro/
+
+# Mise configuration
+.mise.toml
+
+# Local development
+.env
+.env.local
+
+# Docker
+Dockerfile
+.dockerignore

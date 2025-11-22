@@ -11,3 +11,15 @@ run = "cd cdk && npm install && cd ../agent && uv sync"
 
 [tasks.test]
 run = "cd cdk && npm run test && cd ../agent && pytest"
+
+[tasks."agent:build"]
+description = "Build Agent Docker image for ARM64"
+run = "cd agent && docker buildx build --platform linux/arm64 -t slack-issue-agent:latest --load ."
+
+[tasks."agent:push"]
+description = "Build and push Agent Docker image to ECR"
+run = "cd agent && ./scripts/build-and-push-ecr.sh"
+
+[tasks."agent:local"]
+description = "Run Agent locally for testing"
+run = "cd agent && uv run python -m slack_issue_agent.agentcore_app"
